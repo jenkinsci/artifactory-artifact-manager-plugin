@@ -46,7 +46,9 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     @Override
     public URI toURI() {
         try {
-            return new URI(Utils.getUrl(this.key));
+            URI uri = new URI(Utils.getUrl(this.key));
+            LOGGER.trace(String.format("Returning URI %s for file %s", uri, this.key));
+            return uri;
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -55,16 +57,22 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     @CheckForNull
     @Override
     public URL toExternalURL() throws IOException {
-        return new URL(Utils.getUrl(this.key));
+        URL url = new URL(Utils.getUrl(this.key));
+        LOGGER.trace(String.format("Returning URL %s for file %s", url, this.key));
+        return url;
     }
 
     @Override
     public VirtualFile getParent() {
-        return new ArtifactoryVirtualFile(this.key.replaceFirst("/[^/]+$", ""), this.build);
+        LOGGER.trace(String.format("Getting parent of %s", this.key));
+        ArtifactoryVirtualFile file = new ArtifactoryVirtualFile(this.key.replaceFirst("/[^/]+$", ""), this.build);
+        LOGGER.trace(String.format("Parent of %s is %s", this.key, file.getKey()));
+        return file;
     }
 
     @Override
     public boolean isDirectory() throws IOException {
+        LOGGER.trace(String.format("Checking if %s is a directory", this.key));
         String keyWithNoSlash = Utils.stripTrailingSlash(this.key);
         if (keyWithNoSlash.endsWith("/*view*")) {
             return false;
@@ -74,6 +82,7 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
 
     @Override
     public boolean isFile() throws IOException {
+        LOGGER.trace(String.format("Checking if %s is a file", this.key));
         String keyS = this.key + "/";
         if (keyS.endsWith("/*view*/")) {
             return false;
@@ -148,7 +157,9 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
             List<String> files = client.list(prefix);
             List<VirtualFile> virtualFiles = new ArrayList<>();
             for (String file : files) {
-                virtualFiles.add(new ArtifactoryVirtualFile(Utils.stripTrailingSlash(file), this.build));
+                String key = Utils.stripTrailingSlash(file);
+                LOGGER.trace(String.format("Adding virtual file with key %s", key));
+                virtualFiles.add(new ArtifactoryVirtualFile(key, this.build));
             }
             return virtualFiles;
         } catch (IOException e) {

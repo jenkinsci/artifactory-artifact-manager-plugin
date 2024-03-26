@@ -59,6 +59,7 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
         for (Map.Entry<String, String> entry : artifacts.entrySet()) {
             String path = "artifacts/" + entry.getKey();
             String filePath = getFilePath(path);
+            LOGGER.trace(String.format("Archiving key %s with value %s into %s", entry.getKey(), entry.getValue(), filePath));
             files.add(new UploadFile(entry.getKey(), filePath));
         }
 

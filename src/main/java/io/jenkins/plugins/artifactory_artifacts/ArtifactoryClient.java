@@ -101,6 +101,7 @@ class ArtifactoryClient implements Serializable {
      * @throws IOException if the path cannot be checked
      */
     public boolean isFolder(String targetPath) throws IOException {
+        LOGGER.trace(String.format("Checking if %s is a folder", targetPath));
         try (Artifactory artifactory = buildArtifactory()) {
             try {
                 return artifactory.repository(this.repository).isFolder(targetPath);
