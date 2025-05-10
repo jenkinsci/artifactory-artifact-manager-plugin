@@ -64,7 +64,9 @@ public final class Utils {
     }
 
     static String urlEncodeParts(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8).replace("%2F", "/").replace("+", "%20");
+        return URLEncoder.encode(s.replaceAll(" /", "/").replaceAll("/ ", "/"), StandardCharsets.UTF_8)
+                .replace("%2F", "/")
+                .replace("+", "%20");
     }
 
     /**
