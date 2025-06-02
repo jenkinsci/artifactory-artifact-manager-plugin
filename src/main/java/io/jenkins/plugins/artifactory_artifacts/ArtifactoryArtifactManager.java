@@ -284,37 +284,21 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                 }
 
                 // Upload with retry logic
-                int attempt = 0;
-                while (attempt < MAX_UPLOAD_RETRIES) {
-                    try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
-                        LOGGER.debug(String.format(
-                                "Uploading stash to %s (attempt %d/%d)", path, attempt + 1, MAX_UPLOAD_RETRIES));
-                        client.uploadArtifact(tmp, path);
-                        listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
-                        break; // Success, exit retry loop
-                    } catch (Exception e) {
-                        attempt++;
-                        if (attempt >= MAX_UPLOAD_RETRIES) {
-                            LOGGER.error(
-                                    String.format(
-                                            "Unable to stash files to Artifactory after %d attempts",
-                                            MAX_UPLOAD_RETRIES),
-                                    e);
-                            throw new AbortException(String.format(
-                                    "Unable to stash files to Artifactory after %d attempts. Details: %s",
-                                    MAX_UPLOAD_RETRIES, e.getMessage()));
-                        } else {
-                            LOGGER.warn(String.format(
-                                    "Stash upload attempt %d failed for %s, retrying in %dms: %s",
-                                    attempt, path, RETRY_DELAY_MS, e.getMessage()));
-                            try {
-                                Thread.sleep(RETRY_DELAY_MS);
-                            } catch (InterruptedException ie) {
-                                Thread.currentThread().interrupt();
-                                throw new AbortException("Stash upload interrupted during retry delay");
+                try {
+                    executeWithRetry(
+                        () -> {
+                            try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
+                                client.uploadArtifact(tmp, path);
                             }
-                        }
-                    }
+                        },
+                        "Uploading stash to " + path,
+                        MAX_UPLOAD_RETRIES,
+                        RETRY_DELAY_MS,
+                        "Unable to stash files to Artifactory"
+                    );
+                    listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
+                } catch (RuntimeException e) {
+                    throw new AbortException("Unable to stash files to Artifactory after " + MAX_UPLOAD_RETRIES + " attempts. Details: " + e.getMessage());
                 }
             } finally {
                 listener.getLogger().flush();
@@ -393,40 +377,18 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             String filePath = sourceFile.toPath().toString();
             String targetUrl = uploadFile.getUrl();
 
-            int attempt = 0;
-            while (attempt < MAX_UPLOAD_RETRIES) {
-                try {
-                    LOGGER.debug(String.format(
-                            "Uploading %s to %s (attempt %d/%d)",
-                            filePath, targetUrl, attempt + 1, MAX_UPLOAD_RETRIES));
-                    client.uploadArtifact(sourceFile.toPath(), targetUrl);
-                    LOGGER.debug(String.format("Successfully uploaded %s to %s", filePath, targetUrl));
-                    return; // Success, exit retry loop
-                } catch (IOException e) {
-                    attempt++;
-                    if (attempt >= MAX_UPLOAD_RETRIES) {
-                        LOGGER.error(
-                                String.format(
-                                        "Failed to upload %s to %s after %d attempts",
-                                        filePath, targetUrl, MAX_UPLOAD_RETRIES),
-                                e);
-                        throw new RuntimeException(
-                                String.format(
-                                        "Failed to upload %s after %d attempts: %s",
-                                        filePath, MAX_UPLOAD_RETRIES, e.getMessage()),
-                                e);
-                    } else {
-                        LOGGER.warn(String.format(
-                                "Upload attempt %d failed for %s to %s, retrying in %dms: %s",
-                                attempt, filePath, targetUrl, RETRY_DELAY_MS, e.getMessage()));
-                        try {
-                            Thread.sleep(RETRY_DELAY_MS);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException("Upload interrupted during retry delay", ie);
-                        }
-                    }
-                }
+            try {
+                executeWithRetry(
+                    () -> client.uploadArtifact(sourceFile.toPath(), targetUrl),
+                    "Uploading " + filePath + " to " + targetUrl,
+                    MAX_UPLOAD_RETRIES,
+                    RETRY_DELAY_MS,
+                    "Failed to upload " + filePath
+                );
+                LOGGER.debug(String.format("Successfully uploaded %s to %s", filePath, targetUrl));
+            } catch (RuntimeException e) {
+                // Re-throw as RuntimeException to be handled by the CompletableFuture
+                throw e;
             }
         }
     }
@@ -481,6 +443,55 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             } catch (Exception e) {
                 LOGGER.error(
                         String.format("Failed to move %s to %s. Artifactory Pro is needed", sourcePath, targetPath));
+            }
+        }
+    }
+
+    /**
+     * Utility interface for operations that can be retried
+     */
+    @FunctionalInterface
+    private interface RetryableOperation {
+        void execute() throws Exception;
+    }
+
+    /**
+     * Executes an operation with retry logic
+     *
+     * @param operation the operation to retry
+     * @param operationName descriptive name for logging
+     * @param maxRetries maximum number of retry attempts
+     * @param retryDelayMs delay between retries in milliseconds
+     * @param failureMessage message to use when all retries are exhausted
+     * @throws RuntimeException when all retries are exhausted or interrupted
+     */
+    private static void executeWithRetry(
+            RetryableOperation operation,
+            String operationName,
+            int maxRetries,
+            long retryDelayMs,
+            String failureMessage) throws RuntimeException {
+
+        int attempt = 0;
+        while (attempt < maxRetries) {
+            try {
+                LOGGER.debug(String.format("%s (attempt %d/%d)", operationName, attempt + 1, maxRetries));
+                operation.execute();
+                return; // Success, exit retry loop
+            } catch (Exception e) {
+                attempt++;
+                if (attempt >= maxRetries) {
+                    LOGGER.error(String.format("%s after %d attempts", failureMessage, maxRetries), e);
+                    throw new RuntimeException(String.format("%s after %d attempts: %s", failureMessage, maxRetries, e.getMessage()), e);
+                } else {
+                    LOGGER.warn(String.format("%s attempt %d failed, retrying in %dms: %s", operationName, attempt, retryDelayMs, e.getMessage()));
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(operationName + " interrupted during retry delay", ie);
+                    }
+                }
             }
         }
     }
