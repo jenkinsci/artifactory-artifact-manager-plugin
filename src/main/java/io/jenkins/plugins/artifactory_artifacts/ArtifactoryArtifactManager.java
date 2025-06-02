@@ -36,6 +36,8 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArtifactoryArtifactManager.class);
     private static final int UPLOAD_THREADS = 4;
+    private static final int MAX_UPLOAD_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 15000L; // 15 seconds
     private transient Run<?, ?> build;
     private final ArtifactoryGenericArtifactConfig config;
     private transient String defaultKey;
@@ -280,12 +282,39 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                 if (count == 0 && !allowEmpty) {
                     throw new AbortException("No files included in stash");
                 }
-                try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
-                    client.uploadArtifact(tmp, path);
-                    listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
-                } catch (Exception e) {
-                    LOGGER.error("Unable to stash files to Artifactory", e);
-                    throw new AbortException("Unable to stash files to Artifactory. Details: " + e.getMessage());
+
+                // Upload with retry logic
+                int attempt = 0;
+                while (attempt < MAX_UPLOAD_RETRIES) {
+                    try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
+                        LOGGER.debug(String.format(
+                                "Uploading stash to %s (attempt %d/%d)", path, attempt + 1, MAX_UPLOAD_RETRIES));
+                        client.uploadArtifact(tmp, path);
+                        listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
+                        break; // Success, exit retry loop
+                    } catch (Exception e) {
+                        attempt++;
+                        if (attempt >= MAX_UPLOAD_RETRIES) {
+                            LOGGER.error(
+                                    String.format(
+                                            "Unable to stash files to Artifactory after %d attempts",
+                                            MAX_UPLOAD_RETRIES),
+                                    e);
+                            throw new AbortException(String.format(
+                                    "Unable to stash files to Artifactory after %d attempts. Details: %s",
+                                    MAX_UPLOAD_RETRIES, e.getMessage()));
+                        } else {
+                            LOGGER.warn(String.format(
+                                    "Stash upload attempt %d failed for %s, retrying in %dms: %s",
+                                    attempt, path, RETRY_DELAY_MS, e.getMessage()));
+                            try {
+                                Thread.sleep(RETRY_DELAY_MS);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new AbortException("Stash upload interrupted during retry delay");
+                            }
+                        }
+                    }
                 }
             } finally {
                 listener.getLogger().flush();
@@ -360,12 +389,44 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
         }
 
         private void upload(ArtifactoryClient client, File folder, UploadFile uploadFile) {
-            try {
-                File sourceFile = new File(folder, uploadFile.getName());
-                LOGGER.debug(String.format("Uploading %s to %s", sourceFile.toPath(), uploadFile.getUrl()));
-                client.uploadArtifact(sourceFile.toPath(), uploadFile.getUrl());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+            File sourceFile = new File(folder, uploadFile.getName());
+            String filePath = sourceFile.toPath().toString();
+            String targetUrl = uploadFile.getUrl();
+
+            int attempt = 0;
+            while (attempt < MAX_UPLOAD_RETRIES) {
+                try {
+                    LOGGER.debug(String.format(
+                            "Uploading %s to %s (attempt %d/%d)",
+                            filePath, targetUrl, attempt + 1, MAX_UPLOAD_RETRIES));
+                    client.uploadArtifact(sourceFile.toPath(), targetUrl);
+                    LOGGER.debug(String.format("Successfully uploaded %s to %s", filePath, targetUrl));
+                    return; // Success, exit retry loop
+                } catch (IOException e) {
+                    attempt++;
+                    if (attempt >= MAX_UPLOAD_RETRIES) {
+                        LOGGER.error(
+                                String.format(
+                                        "Failed to upload %s to %s after %d attempts",
+                                        filePath, targetUrl, MAX_UPLOAD_RETRIES),
+                                e);
+                        throw new RuntimeException(
+                                String.format(
+                                        "Failed to upload %s after %d attempts: %s",
+                                        filePath, MAX_UPLOAD_RETRIES, e.getMessage()),
+                                e);
+                    } else {
+                        LOGGER.warn(String.format(
+                                "Upload attempt %d failed for %s to %s, retrying in %dms: %s",
+                                attempt, filePath, targetUrl, RETRY_DELAY_MS, e.getMessage()));
+                        try {
+                            Thread.sleep(RETRY_DELAY_MS);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Upload interrupted during retry delay", ie);
+                        }
+                    }
+                }
             }
         }
     }
