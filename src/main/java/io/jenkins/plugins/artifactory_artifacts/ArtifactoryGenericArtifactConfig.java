@@ -42,6 +42,8 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     private String serverUrl;
     private String repository;
     private String prefix;
+    private int maxUploadRetries = 3;
+    private long retryDelaySeconds = 15;
 
     @DataBoundConstructor
     public ArtifactoryGenericArtifactConfig() {}
@@ -52,6 +54,19 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.serverUrl = serverUrl;
         this.repository = repository;
         this.prefix = prefix;
+        this.maxUploadRetries = 3;
+        this.retryDelaySeconds = 15;
+    }
+
+    public ArtifactoryGenericArtifactConfig(
+            String storageCredentialId, String serverUrl, String repository, String prefix, 
+            int maxUploadRetries, int retryDelaySeconds) {
+        this.storageCredentialId = storageCredentialId;
+        this.serverUrl = serverUrl;
+        this.repository = repository;
+        this.prefix = prefix;
+        this.maxUploadRetries = maxUploadRetries;
+        this.retryDelaySeconds = retryDelaySeconds;
     }
 
     public String getStorageCredentialId() {
@@ -88,6 +103,24 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     @DataBoundSetter
     public void setPrefix(String prefix) {
         this.prefix = prefix;
+    }
+
+    public int getMaxUploadRetries() {
+        return maxUploadRetries;
+    }
+
+    @DataBoundSetter
+    public void setMaxUploadRetries(int maxUploadRetries) {
+        this.maxUploadRetries = Math.max(1, maxUploadRetries); // Minimum 1 retry
+    }
+
+    public long getRetryDelaySeconds() {
+        return retryDelaySeconds;
+    }
+
+    @DataBoundSetter
+    public void setRetryDelaySeconds(long retryDelaySeconds) {
+        this.retryDelaySeconds = Math.max(1, retryDelaySeconds); // Minimum 1 second
     }
 
     public static ArtifactoryGenericArtifactConfig get() {
@@ -170,6 +203,30 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
                 ret = FormValidation.error("Server url doesn't seem valid. Should start with http:// or https://");
             }
             return ret;
+        }
+
+        @SuppressWarnings("lgtm[jenkins/csrf]")
+        public FormValidation doCheckMaxUploadRetries(@QueryParameter int maxUploadRetries) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            if (maxUploadRetries < 1) {
+                return FormValidation.error("Max retries must be at least 1");
+            }
+            if (maxUploadRetries > 10) {
+                return FormValidation.warning("Consider using a lower number of retries to avoid long delays");
+            }
+            return FormValidation.ok();
+        }
+
+        @SuppressWarnings("lgtm[jenkins/csrf]")
+        public FormValidation doCheckRetryDelaySeconds(@QueryParameter long retryDelaySeconds) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            if (retryDelaySeconds < 1) {
+                return FormValidation.error("Retry delay must be at least 1 second");
+            }
+            if (retryDelaySeconds > 300) {
+                return FormValidation.warning("Consider using a shorter delay to avoid very long waits");
+            }
+            return FormValidation.ok();
         }
 
         @RequirePOST

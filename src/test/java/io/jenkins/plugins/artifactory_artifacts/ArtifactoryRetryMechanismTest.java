@@ -38,7 +38,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
             }
             """;
 
-        // Setup WireMock to fail on first 2 attempts, succeed on 3rd
+        // Setup WireMock to fail on first attempt, succeed on 2nd
         WireMock wireMock = wmRuntimeInfo.getWireMock();
 
         // Scenario to simulate transient failures
@@ -51,18 +51,11 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
                 .willReturn(WireMock.serverError())
                 .willSetStateTo("second-attempt"));
 
-        // Second attempt fails with 503
+        // Second attempt succeeds
         wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*"))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs("second-attempt")
-                .willReturn(WireMock.serviceUnavailable())
-                .willSetStateTo("third-attempt"));
-
-        // Third attempt succeeds
-        wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*"))
-                .inScenario(scenarioName)
-                .whenScenarioStateIs("third-attempt")
-                .willReturn(WireMock.okJson("{}")));
+                .willReturn(WireMock.okJson(("{}"))));
 
         // Setup other required stubs (excluding PUT which we handle above)
         setupOtherWireMockStubs(pipelineName, wireMock, wmRuntimeInfo.getHttpPort(), "", "artifact.txt", "stash.tgz");
@@ -76,8 +69,8 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Should succeed after retries
         assertThat(run.getResult(), equalTo(hudson.model.Result.SUCCESS));
 
-        // Verify all 3 requests were made
-        wireMock.verifyThat(3, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
+        // Verify exactly 2 requests were made
+        wireMock.verifyThat(2, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
     }
 
     @Test
@@ -112,8 +105,8 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Should fail after max retries
         assertThat(run.getResult(), equalTo(hudson.model.Result.FAILURE));
 
-        // Verify exactly MAX_UPLOAD_RETRIES (3) requests were made
-        wireMock.verifyThat(3, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
+        // Verify exactly 2 requests were made (matching maxUploadRetries configuration)
+        wireMock.verifyThat(2, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
 
         // Check build log contains retry messages
         String buildLog = run.getLog();
@@ -147,17 +140,10 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
                 .willReturn(WireMock.serverError())
                 .willSetStateTo("second-attempt"));
 
-        // Second attempt fails
+        // Second attempt succeeds
         wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*"))
                 .inScenario(scenarioName)
                 .whenScenarioStateIs("second-attempt")
-                .willReturn(WireMock.serviceUnavailable())
-                .willSetStateTo("third-attempt"));
-
-        // Third attempt succeeds
-        wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*"))
-                .inScenario(scenarioName)
-                .whenScenarioStateIs("third-attempt")
                 .willReturn(WireMock.okJson("{}")));
 
         // Setup other required stubs (for artifacts that won't be created in this test)
@@ -173,8 +159,8 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Should succeed after retries
         assertThat(run.getResult(), equalTo(hudson.model.Result.SUCCESS));
 
-        // Verify all 3 stash upload requests were made
-        wireMock.verifyThat(3, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*")));
+        // Verify exactly 2 stash upload requests were made
+        wireMock.verifyThat(2, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*")));
     }
 
     @Test
@@ -210,12 +196,12 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Should fail after max retries
         assertThat(run.getResult(), equalTo(hudson.model.Result.FAILURE));
 
-        // Verify exactly MAX_UPLOAD_RETRIES (3) stash upload requests were made
-        wireMock.verifyThat(3, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*")));
+        // Verify exactly 2 stash upload requests were made (matching maxUploadRetries configuration)
+        wireMock.verifyThat(2, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*/stashes/.*")));
 
         // Check build log contains retry messages
         String buildLog = run.getLog();
-        assertThat(buildLog, containsString("Unable to stash files to Artifactory after 3 attempts"));
+        assertThat(buildLog, containsString("Unable to stash files to Artifactory after 2 attempts"));
     }
 
     @Test
