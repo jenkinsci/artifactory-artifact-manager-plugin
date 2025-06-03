@@ -38,12 +38,16 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
 
     public static final Logger LOGGER = LoggerFactory.getLogger(ArtifactoryGenericArtifactConfig.class);
 
+    // Default values for retry configuration
+    public static final int DEFAULT_MAX_UPLOAD_RETRIES = 0;
+    public static final int DEFAULT_RETRY_DELAY_SECONDS = 5;
+
     private String storageCredentialId;
     private String serverUrl;
     private String repository;
     private String prefix;
-    private int maxUploadRetries = 0;
-    private int retryDelaySeconds = 5;
+    private int maxUploadRetries = DEFAULT_MAX_UPLOAD_RETRIES;
+    private int retryDelaySeconds = DEFAULT_RETRY_DELAY_SECONDS;
 
     @DataBoundConstructor
     public ArtifactoryGenericArtifactConfig() {}
@@ -54,8 +58,8 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.serverUrl = serverUrl;
         this.repository = repository;
         this.prefix = prefix;
-        this.maxUploadRetries = 0;
-        this.retryDelaySeconds = 5;
+        this.maxUploadRetries = DEFAULT_MAX_UPLOAD_RETRIES;
+        this.retryDelaySeconds = DEFAULT_RETRY_DELAY_SECONDS;
     }
 
     public ArtifactoryGenericArtifactConfig(
