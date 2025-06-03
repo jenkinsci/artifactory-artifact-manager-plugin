@@ -299,8 +299,10 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                             "Unable to stash files to Artifactory");
                     listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
                 } catch (RuntimeException e) {
-                    throw new AbortException("Unable to stash files to Artifactory after "
-                            + this.config.getMaxUploadRetries() + " attempts. Details: " + e.getMessage());
+                    String message = this.config.getMaxUploadRetries() == 0
+                        ? "Unable to stash files to Artifactory on first attempt (no retries configured)"
+                        : "Unable to stash files to Artifactory after " + this.config.getMaxUploadRetries() + " attempts";
+                    throw new AbortException(message + ". Details: " + e.getMessage());
                 }
             } finally {
                 listener.getLogger().flush();
@@ -479,18 +481,24 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             String failureMessage)
             throws RuntimeException {
 
+        // When maxRetries is 0, try once and fail immediately if there's an error
+        int maxAttempts = Math.max(1, maxRetries);
+        
         int attempt = 0;
-        while (attempt < maxRetries) {
+        while (attempt < maxAttempts) {
             try {
-                LOGGER.debug(String.format("%s (attempt %d/%d)", operationName, attempt + 1, maxRetries));
+                LOGGER.debug(String.format("%s (attempt %d/%d)", operationName, attempt + 1, maxAttempts));
                 operation.execute();
                 return; // Success, exit retry loop
             } catch (Exception e) {
                 attempt++;
-                if (attempt >= maxRetries) {
-                    LOGGER.error(String.format("%s after %d attempts", failureMessage, maxRetries), e);
+                if (attempt >= maxAttempts) {
+                    String message = maxRetries == 0 
+                        ? String.format("%s on first attempt (no retries configured)", failureMessage)
+                        : String.format("%s after %d attempts", failureMessage, maxRetries);
+                    LOGGER.error(message, e);
                     throw new RuntimeException(
-                            String.format("%s after %d attempts: %s", failureMessage, maxRetries, e.getMessage()), e);
+                            String.format("%s: %s", message, e.getMessage()), e);
                 } else {
                     LOGGER.warn(String.format(
                             "%s attempt %d failed, retrying in %dms: %s",

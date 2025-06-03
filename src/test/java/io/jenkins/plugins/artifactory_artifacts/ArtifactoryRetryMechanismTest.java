@@ -242,4 +242,48 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Verify only 2 requests were made (1 for artifact, 1 for stash) - no retries
         wireMock.verifyThat(2, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
     }
+
+    @Test
+    public void shouldFailImmediatelyWithZeroRetries(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
+            throws Exception {
+        // Configure with 0 retries
+        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "");
+        config.setMaxUploadRetries(0);
+        
+        String pipelineName = "shouldFailImmediatelyWithZeroRetries";
+
+        // Create pipeline that archives a file
+        String pipeline =
+                """
+            node {
+                writeFile file: 'artifact.txt', text: 'Hello World'
+                archiveArtifacts artifacts: 'artifact.txt'
+            }
+            """;
+
+        // Setup WireMock to always fail
+        WireMock wireMock = wmRuntimeInfo.getWireMock();
+        wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*"))
+                .willReturn(WireMock.serverError()));
+
+        // Setup other required stubs
+        setupOtherWireMockStubs(
+                pipelineName, wireMock, wmRuntimeInfo.getHttpPort(), "", "artifact.txt", "stash.tgz");
+
+        // Run the pipeline
+        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+        WorkflowRun run = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+        jenkinsRule.waitForCompletion(run);
+
+        // Should fail immediately
+        assertThat(run.getResult(), equalTo(hudson.model.Result.FAILURE));
+
+        // Verify exactly 1 request was made (no retries)
+        wireMock.verifyThat(1, WireMock.putRequestedFor(WireMock.urlMatching("/my-generic-repo/.*")));
+
+        // Check build log contains appropriate message
+        String buildLog = run.getLog();
+        assertThat(buildLog, containsString("on first attempt (no retries configured)"));
+    }
 }

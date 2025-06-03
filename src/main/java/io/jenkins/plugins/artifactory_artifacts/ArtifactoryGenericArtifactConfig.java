@@ -111,7 +111,7 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
 
     @DataBoundSetter
     public void setMaxUploadRetries(int maxUploadRetries) {
-        this.maxUploadRetries = Math.max(1, maxUploadRetries); // Minimum 1 retry
+        this.maxUploadRetries = Math.max(0, maxUploadRetries); // Minimum 0 retries (no retries)
     }
 
     public long getRetryDelaySeconds() {
@@ -120,7 +120,7 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
 
     @DataBoundSetter
     public void setRetryDelaySeconds(long retryDelaySeconds) {
-        this.retryDelaySeconds = Math.max(1, retryDelaySeconds); // Minimum 1 second
+        this.retryDelaySeconds = Math.max(0, retryDelaySeconds); // Minimum 0 seconds (no delay)
     }
 
     public static ArtifactoryGenericArtifactConfig get() {
@@ -208,11 +208,14 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         @SuppressWarnings("lgtm[jenkins/csrf]")
         public FormValidation doCheckMaxUploadRetries(@QueryParameter int maxUploadRetries) {
             Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-            if (maxUploadRetries < 1) {
-                return FormValidation.error("Max retries must be at least 1");
+            if (maxUploadRetries < 0) {
+                return FormValidation.error("Max retries cannot be negative");
             }
             if (maxUploadRetries > 10) {
                 return FormValidation.warning("Consider using a lower number of retries to avoid long delays");
+            }
+            if (maxUploadRetries == 0) {
+                return FormValidation.ok("No retries - operations will fail immediately on first error");
             }
             return FormValidation.ok();
         }
@@ -220,11 +223,14 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         @SuppressWarnings("lgtm[jenkins/csrf]")
         public FormValidation doCheckRetryDelaySeconds(@QueryParameter long retryDelaySeconds) {
             Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-            if (retryDelaySeconds < 1) {
-                return FormValidation.error("Retry delay must be at least 1 second");
+            if (retryDelaySeconds < 0) {
+                return FormValidation.error("Retry delay cannot be negative");
             }
             if (retryDelaySeconds > 300) {
                 return FormValidation.warning("Consider using a shorter delay to avoid very long waits");
+            }
+            if (retryDelaySeconds == 0) {
+                return FormValidation.ok("No delay - retries will happen immediately");
             }
             return FormValidation.ok();
         }

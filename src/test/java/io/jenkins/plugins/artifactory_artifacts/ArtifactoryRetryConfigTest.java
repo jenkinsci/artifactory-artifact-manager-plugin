@@ -30,15 +30,27 @@ public class ArtifactoryRetryConfigTest {
     }
 
     @Test
-    public void shouldValidateMinimumRetryValues() {
+    public void shouldAllowZeroRetryValues() {
         ArtifactoryGenericArtifactConfig config = new ArtifactoryGenericArtifactConfig();
 
         config.setMaxUploadRetries(0);
         config.setRetryDelaySeconds(0);
 
-        // Should enforce minimum values
-        assertThat("Min retries should be enforced", config.getMaxUploadRetries(), equalTo(1));
-        assertThat("Min delay should be enforced", config.getRetryDelaySeconds(), equalTo(1L));
+        // Should allow zero values
+        assertThat("Zero retries should be allowed", config.getMaxUploadRetries(), equalTo(0));
+        assertThat("Zero delay should be allowed", config.getRetryDelaySeconds(), equalTo(0L));
+    }
+
+    @Test
+    public void shouldPreventNegativeRetryValues() {
+        ArtifactoryGenericArtifactConfig config = new ArtifactoryGenericArtifactConfig();
+
+        config.setMaxUploadRetries(-1);
+        config.setRetryDelaySeconds(-1);
+
+        // Should enforce minimum of 0
+        assertThat("Negative retries should be set to 0", config.getMaxUploadRetries(), equalTo(0));
+        assertThat("Negative delay should be set to 0", config.getRetryDelaySeconds(), equalTo(0L));
     }
 
     @Test
@@ -54,5 +66,20 @@ public class ArtifactoryRetryConfigTest {
                 "Config should have custom retry delay",
                 config.getRetryDelaySeconds(),
                 equalTo(30L));
+    }
+
+    @Test
+    public void shouldCreateConfigWithZeroRetryValues() {
+        ArtifactoryGenericArtifactConfig config =
+                new ArtifactoryGenericArtifactConfig("cred-id", "http://localhost:8081", "repo", "prefix", 0, 0);
+
+        assertThat(
+                "Config should allow zero retry count",
+                config.getMaxUploadRetries(),
+                equalTo(0));
+        assertThat(
+                "Config should allow zero retry delay",
+                config.getRetryDelaySeconds(),
+                equalTo(0L));
     }
 }
