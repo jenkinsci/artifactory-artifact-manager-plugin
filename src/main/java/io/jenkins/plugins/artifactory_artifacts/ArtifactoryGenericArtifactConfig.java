@@ -63,8 +63,12 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     }
 
     public ArtifactoryGenericArtifactConfig(
-            String storageCredentialId, String serverUrl, String repository, String prefix, 
-            int maxUploadRetries, int retryDelaySeconds) {
+            String storageCredentialId,
+            String serverUrl,
+            String repository,
+            String prefix,
+            int maxUploadRetries,
+            int retryDelaySeconds) {
         this.storageCredentialId = storageCredentialId;
         this.serverUrl = serverUrl;
         this.repository = repository;

@@ -300,8 +300,9 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                     listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
                 } catch (RuntimeException e) {
                     String message = this.config.getMaxUploadRetries() == 0
-                        ? "Unable to stash files to Artifactory on first attempt (no retries configured)"
-                        : "Unable to stash files to Artifactory after " + this.config.getMaxUploadRetries() + " attempts";
+                            ? "Unable to stash files to Artifactory on first attempt (no retries configured)"
+                            : "Unable to stash files to Artifactory after " + this.config.getMaxUploadRetries()
+                                    + " attempts";
                     throw new AbortException(message + ". Details: " + e.getMessage());
                 }
             } finally {
@@ -483,7 +484,7 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
 
         // When maxRetries is 0, try once and fail immediately if there's an error
         int maxAttempts = Math.max(1, maxRetries);
-        
+
         int attempt = 0;
         while (attempt < maxAttempts) {
             try {
@@ -493,12 +494,11 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             } catch (Exception e) {
                 attempt++;
                 if (attempt >= maxAttempts) {
-                    String message = maxRetries == 0 
-                        ? String.format("%s on first attempt (no retries configured)", failureMessage)
-                        : String.format("%s after %d attempts", failureMessage, maxRetries);
+                    String message = maxRetries == 0
+                            ? String.format("%s on first attempt (no retries configured)", failureMessage)
+                            : String.format("%s after %d attempts", failureMessage, maxRetries);
                     LOGGER.error(message, e);
-                    throw new RuntimeException(
-                            String.format("%s: %s", message, e.getMessage()), e);
+                    throw new RuntimeException(String.format("%s: %s", message, e.getMessage()), e);
                 } else {
                     LOGGER.warn(String.format(
                             "%s attempt %d failed, retrying in %dms: %s",

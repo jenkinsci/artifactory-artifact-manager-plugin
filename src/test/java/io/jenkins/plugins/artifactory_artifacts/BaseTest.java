@@ -21,7 +21,7 @@ public class BaseTest {
         config.setServerUrl("http://localhost:" + port);
         config.setRepository("my-generic-repo");
         config.setStorageCredentialId("the-credentials-id");
-        config.setMaxUploadRetries(2);  // Use 2 retries for faster tests
+        config.setMaxUploadRetries(2); // Use 2 retries for faster tests
         config.setRetryDelaySeconds(1); // Use 1 second delay for faster tests
 
         // Add credentials to the store

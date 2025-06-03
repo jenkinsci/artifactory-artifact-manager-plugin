@@ -58,14 +58,8 @@ public class ArtifactoryRetryConfigTest {
         ArtifactoryGenericArtifactConfig config =
                 new ArtifactoryGenericArtifactConfig("cred-id", "http://localhost:8081", "repo", "prefix", 5, 30);
 
-        assertThat(
-                "Config should have custom retry count",
-                config.getMaxUploadRetries(),
-                equalTo(5));
-        assertThat(
-                "Config should have custom retry delay",
-                config.getRetryDelaySeconds(),
-                equalTo(30));
+        assertThat("Config should have custom retry count", config.getMaxUploadRetries(), equalTo(5));
+        assertThat("Config should have custom retry delay", config.getRetryDelaySeconds(), equalTo(30));
     }
 
     @Test
@@ -73,13 +67,7 @@ public class ArtifactoryRetryConfigTest {
         ArtifactoryGenericArtifactConfig config =
                 new ArtifactoryGenericArtifactConfig("cred-id", "http://localhost:8081", "repo", "prefix", 0, 0);
 
-        assertThat(
-                "Config should allow zero retry count",
-                config.getMaxUploadRetries(),
-                equalTo(0));
-        assertThat(
-                "Config should allow zero retry delay",
-                config.getRetryDelaySeconds(),
-                equalTo(0));
+        assertThat("Config should allow zero retry count", config.getMaxUploadRetries(), equalTo(0));
+        assertThat("Config should allow zero retry delay", config.getRetryDelaySeconds(), equalTo(0));
     }
 }

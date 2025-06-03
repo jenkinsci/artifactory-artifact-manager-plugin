@@ -254,9 +254,12 @@ class ArtifactoryClient implements AutoCloseable {
         private final int retryDelaySeconds;
 
         public ArtifactoryConfig(String serverUrl, String repository, UsernamePasswordCredentials credentials) {
-            this(serverUrl, repository, credentials, 
-                ArtifactoryGenericArtifactConfig.DEFAULT_MAX_UPLOAD_RETRIES, 
-                ArtifactoryGenericArtifactConfig.DEFAULT_RETRY_DELAY_SECONDS);
+            this(
+                    serverUrl,
+                    repository,
+                    credentials,
+                    ArtifactoryGenericArtifactConfig.DEFAULT_MAX_UPLOAD_RETRIES,
+                    ArtifactoryGenericArtifactConfig.DEFAULT_RETRY_DELAY_SECONDS);
         }
 
         public ArtifactoryConfig(

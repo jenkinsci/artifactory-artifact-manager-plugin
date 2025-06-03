@@ -249,7 +249,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         // Configure with 0 retries
         ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "");
         config.setMaxUploadRetries(0);
-        
+
         String pipelineName = "shouldFailImmediatelyWithZeroRetries";
 
         // Create pipeline that archives a file
@@ -263,12 +263,11 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
 
         // Setup WireMock to always fail
         WireMock wireMock = wmRuntimeInfo.getWireMock();
-        wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/.*"))
-                .willReturn(WireMock.serverError()));
+        wireMock.register(
+                WireMock.put(WireMock.urlMatching("/my-generic-repo/.*")).willReturn(WireMock.serverError()));
 
         // Setup other required stubs
-        setupOtherWireMockStubs(
-                pipelineName, wireMock, wmRuntimeInfo.getHttpPort(), "", "artifact.txt", "stash.tgz");
+        setupOtherWireMockStubs(pipelineName, wireMock, wmRuntimeInfo.getHttpPort(), "", "artifact.txt", "stash.tgz");
 
         // Run the pipeline
         WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);

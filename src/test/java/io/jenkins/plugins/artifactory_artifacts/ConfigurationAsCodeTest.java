@@ -29,7 +29,8 @@ public class ConfigurationAsCodeTest extends BaseTest {
 
     @Test
     @ConfiguredWithCode("configuration-as-code-zero-retries.yml")
-    public void shouldSupportConfigurationAsCodeWithZeroRetries(JenkinsConfiguredWithCodeRule jenkinsRule) throws Exception {
+    public void shouldSupportConfigurationAsCodeWithZeroRetries(JenkinsConfiguredWithCodeRule jenkinsRule)
+            throws Exception {
         ArtifactoryGenericArtifactConfig config = Utils.getArtifactConfig();
         assertThat(config.getStorageCredentialId(), is("the-credentials-id"));
         assertThat(config.getServerUrl(), is("http://localhost:7000"));
