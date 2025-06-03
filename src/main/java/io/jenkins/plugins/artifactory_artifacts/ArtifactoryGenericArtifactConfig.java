@@ -42,8 +42,8 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     private String serverUrl;
     private String repository;
     private String prefix;
-    private int maxUploadRetries = 3;
-    private long retryDelaySeconds = 15;
+    private int maxUploadRetries = 0;
+    private long retryDelaySeconds = 5;
 
     @DataBoundConstructor
     public ArtifactoryGenericArtifactConfig() {}
@@ -54,8 +54,8 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.serverUrl = serverUrl;
         this.repository = repository;
         this.prefix = prefix;
-        this.maxUploadRetries = 3;
-        this.retryDelaySeconds = 15;
+        this.maxUploadRetries = 0;
+        this.retryDelaySeconds = 5;
     }
 
     public ArtifactoryGenericArtifactConfig(

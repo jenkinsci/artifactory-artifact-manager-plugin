@@ -14,8 +14,8 @@ public class ArtifactoryRetryConfigTest {
     public void shouldHaveDefaultRetryValues() {
         ArtifactoryGenericArtifactConfig config = new ArtifactoryGenericArtifactConfig();
 
-        assertThat("Default max upload retries should be 3", config.getMaxUploadRetries(), equalTo(3));
-        assertThat("Default retry delay should be 15 seconds", config.getRetryDelaySeconds(), equalTo(15L));
+        assertThat("Default max upload retries should be 0", config.getMaxUploadRetries(), equalTo(0));
+        assertThat("Default retry delay should be 5 seconds", config.getRetryDelaySeconds(), equalTo(5L));
     }
 
     @Test
