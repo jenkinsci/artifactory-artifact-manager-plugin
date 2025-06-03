@@ -7,5 +7,5 @@ unclassified:
             repository: "my-generic-repo"
             serverUrl: "http://localhost:7000"
             storageCredentialId: "the-credentials-id"
-            maxUploadRetries: 3
-            retryDelaySeconds: 10
+            maxUploadRetries: 0
+            retryDelaySeconds: 0

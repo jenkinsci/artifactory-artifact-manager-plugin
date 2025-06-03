@@ -10,6 +10,7 @@ import jenkins.model.ArtifactManagerFactoryDescriptor;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.jenkinsci.Symbol;
 
 @Restricted(NoExternalUse.class)
 public class ArtifactoryArtifactManagerFactory extends ArtifactManagerFactory {
@@ -35,6 +36,7 @@ public class ArtifactoryArtifactManagerFactory extends ArtifactManagerFactory {
     }
 
     @Extension
+    @Symbol("artifactory")
     public static final class DescriptorImpl extends ArtifactManagerFactoryDescriptor {
         @NonNull
         @Override
