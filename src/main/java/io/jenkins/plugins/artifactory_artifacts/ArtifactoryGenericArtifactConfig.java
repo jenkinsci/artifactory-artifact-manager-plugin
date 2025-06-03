@@ -43,7 +43,7 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     private String repository;
     private String prefix;
     private int maxUploadRetries = 0;
-    private long retryDelaySeconds = 5;
+    private int retryDelaySeconds = 5;
 
     @DataBoundConstructor
     public ArtifactoryGenericArtifactConfig() {}
@@ -114,12 +114,12 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.maxUploadRetries = Math.max(0, maxUploadRetries); // Minimum 0 retries (no retries)
     }
 
-    public long getRetryDelaySeconds() {
+    public int getRetryDelaySeconds() {
         return retryDelaySeconds;
     }
 
     @DataBoundSetter
-    public void setRetryDelaySeconds(long retryDelaySeconds) {
+    public void setRetryDelaySeconds(int retryDelaySeconds) {
         this.retryDelaySeconds = Math.max(0, retryDelaySeconds); // Minimum 0 seconds (no delay)
     }
 
@@ -221,7 +221,7 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         }
 
         @SuppressWarnings("lgtm[jenkins/csrf]")
-        public FormValidation doCheckRetryDelaySeconds(@QueryParameter long retryDelaySeconds) {
+        public FormValidation doCheckRetryDelaySeconds(@QueryParameter int retryDelaySeconds) {
             Jenkins.get().checkPermission(Jenkins.ADMINISTER);
             if (retryDelaySeconds < 0) {
                 return FormValidation.error("Retry delay cannot be negative");

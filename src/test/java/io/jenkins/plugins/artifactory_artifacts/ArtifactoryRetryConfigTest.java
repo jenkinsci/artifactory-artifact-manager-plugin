@@ -15,7 +15,7 @@ public class ArtifactoryRetryConfigTest {
         ArtifactoryGenericArtifactConfig config = new ArtifactoryGenericArtifactConfig();
 
         assertThat("Default max upload retries should be 0", config.getMaxUploadRetries(), equalTo(0));
-        assertThat("Default retry delay should be 5 seconds", config.getRetryDelaySeconds(), equalTo(5L));
+        assertThat("Default retry delay should be 5 seconds", config.getRetryDelaySeconds(), equalTo(5));
     }
 
     @Test
@@ -26,7 +26,7 @@ public class ArtifactoryRetryConfigTest {
         config.setRetryDelaySeconds(30);
 
         assertThat("Max upload retries should be configurable", config.getMaxUploadRetries(), equalTo(5));
-        assertThat("Retry delay should be configurable", config.getRetryDelaySeconds(), equalTo(30L));
+        assertThat("Retry delay should be configurable", config.getRetryDelaySeconds(), equalTo(30));
     }
 
     @Test
@@ -38,7 +38,7 @@ public class ArtifactoryRetryConfigTest {
 
         // Should allow zero values
         assertThat("Zero retries should be allowed", config.getMaxUploadRetries(), equalTo(0));
-        assertThat("Zero delay should be allowed", config.getRetryDelaySeconds(), equalTo(0L));
+        assertThat("Zero delay should be allowed", config.getRetryDelaySeconds(), equalTo(0));
     }
 
     @Test
@@ -50,7 +50,7 @@ public class ArtifactoryRetryConfigTest {
 
         // Should enforce minimum of 0
         assertThat("Negative retries should be set to 0", config.getMaxUploadRetries(), equalTo(0));
-        assertThat("Negative delay should be set to 0", config.getRetryDelaySeconds(), equalTo(0L));
+        assertThat("Negative delay should be set to 0", config.getRetryDelaySeconds(), equalTo(0));
     }
 
     @Test
@@ -65,7 +65,7 @@ public class ArtifactoryRetryConfigTest {
         assertThat(
                 "Config should have custom retry delay",
                 config.getRetryDelaySeconds(),
-                equalTo(30L));
+                equalTo(30));
     }
 
     @Test
@@ -80,6 +80,6 @@ public class ArtifactoryRetryConfigTest {
         assertThat(
                 "Config should allow zero retry delay",
                 config.getRetryDelaySeconds(),
-                equalTo(0L));
+                equalTo(0));
     }
 }

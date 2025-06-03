@@ -24,7 +24,7 @@ public class ConfigurationAsCodeTest extends BaseTest {
         assertThat(config.getRepository(), is("my-generic-repo"));
         assertThat(config.getPrefix(), is("jenkins/"));
         assertThat(config.getMaxUploadRetries(), is(3));
-        assertThat(config.getRetryDelaySeconds(), is(10L));
+        assertThat(config.getRetryDelaySeconds(), is(10));
     }
 
     @Test
@@ -36,6 +36,6 @@ public class ConfigurationAsCodeTest extends BaseTest {
         assertThat(config.getRepository(), is("my-generic-repo"));
         assertThat(config.getPrefix(), is("jenkins/"));
         assertThat(config.getMaxUploadRetries(), is(0));
-        assertThat(config.getRetryDelaySeconds(), is(0L));
+        assertThat(config.getRetryDelaySeconds(), is(0));
     }
 }
