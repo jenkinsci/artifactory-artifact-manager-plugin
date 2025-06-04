@@ -205,7 +205,11 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
 
     private ArtifactoryClient.ArtifactoryConfig buildArtifactoryConfig() {
         return new ArtifactoryClient.ArtifactoryConfig(
-                this.config.getServerUrl(), this.config.getRepository(), Utils.getCredentials());
+                this.config.getServerUrl(),
+                this.config.getRepository(),
+                Utils.getCredentials(),
+                this.config.getMaxUploadRetries(),
+                this.config.getRetryDelaySeconds());
     }
 
     private static class UploadFile implements Serializable {
@@ -280,12 +284,26 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                 if (count == 0 && !allowEmpty) {
                     throw new AbortException("No files included in stash");
                 }
-                try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
-                    client.uploadArtifact(tmp, path);
+
+                // Upload with retry logic
+                try {
+                    executeWithRetry(
+                            () -> {
+                                try (ArtifactoryClient client = new ArtifactoryClient(this.config)) {
+                                    client.uploadArtifact(tmp, path);
+                                }
+                            },
+                            "Uploading stash to " + path,
+                            this.config.getMaxUploadRetries(),
+                            this.config.getRetryDelaySeconds() * 1000L, // Convert seconds to milliseconds
+                            "Unable to stash files to Artifactory");
                     listener.getLogger().printf("Stashed %d file(s) to %s%n", count, path);
-                } catch (Exception e) {
-                    LOGGER.error("Unable to stash files to Artifactory", e);
-                    throw new AbortException("Unable to stash files to Artifactory. Details: " + e.getMessage());
+                } catch (RuntimeException e) {
+                    String message = this.config.getMaxUploadRetries() == 0
+                            ? "Unable to stash files to Artifactory on first attempt (no retries configured)"
+                            : "Unable to stash files to Artifactory after " + this.config.getMaxUploadRetries()
+                                    + " attempts";
+                    throw new AbortException(message + ". Details: " + e.getMessage());
                 }
             } finally {
                 listener.getLogger().flush();
@@ -346,7 +364,8 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
                 ExecutorService executor = Executors.newFixedThreadPool(UPLOAD_THREADS);
                 try {
                     CompletableFuture<Void> allUploads = CompletableFuture.allOf(files.stream()
-                            .map(file -> CompletableFuture.runAsync(() -> upload(client, folder, file), executor))
+                            .map(file -> CompletableFuture.runAsync(
+                                    () -> upload(client, folder, file, this.config), executor))
                             .toArray(CompletableFuture[]::new));
                     allUploads.get();
                 } finally {
@@ -359,13 +378,26 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             return null;
         }
 
-        private void upload(ArtifactoryClient client, File folder, UploadFile uploadFile) {
+        private void upload(
+                ArtifactoryClient client,
+                File folder,
+                UploadFile uploadFile,
+                ArtifactoryClient.ArtifactoryConfig config) {
+            File sourceFile = new File(folder, uploadFile.getName());
+            String filePath = sourceFile.toPath().toString();
+            String targetUrl = uploadFile.getUrl();
+
             try {
-                File sourceFile = new File(folder, uploadFile.getName());
-                LOGGER.debug(String.format("Uploading %s to %s", sourceFile.toPath(), uploadFile.getUrl()));
-                client.uploadArtifact(sourceFile.toPath(), uploadFile.getUrl());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                executeWithRetry(
+                        () -> client.uploadArtifact(sourceFile.toPath(), targetUrl),
+                        "Uploading " + filePath + " to " + targetUrl,
+                        config.getMaxUploadRetries(),
+                        config.getRetryDelaySeconds() * 1000L, // Convert seconds to milliseconds
+                        "Failed to upload " + filePath);
+                LOGGER.debug(String.format("Successfully uploaded %s to %s", filePath, targetUrl));
+            } catch (RuntimeException e) {
+                // Re-throw as RuntimeException to be handled by the CompletableFuture
+                throw e;
             }
         }
     }
@@ -420,6 +452,64 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
             } catch (Exception e) {
                 LOGGER.error(
                         String.format("Failed to move %s to %s. Artifactory Pro is needed", sourcePath, targetPath));
+            }
+        }
+    }
+
+    /**
+     * Utility interface for operations that can be retried
+     */
+    @FunctionalInterface
+    private interface RetryableOperation {
+        void execute() throws Exception;
+    }
+
+    /**
+     * Executes an operation with retry logic
+     *
+     * @param operation the operation to retry
+     * @param operationName descriptive name for logging
+     * @param maxRetries maximum number of retry attempts
+     * @param retryDelayMs delay between retries in milliseconds
+     * @param failureMessage message to use when all retries are exhausted
+     * @throws RuntimeException when all retries are exhausted or interrupted
+     */
+    private static void executeWithRetry(
+            RetryableOperation operation,
+            String operationName,
+            int maxRetries,
+            long retryDelayMs,
+            String failureMessage)
+            throws RuntimeException {
+
+        // When maxRetries is 0, try once and fail immediately if there's an error
+        int maxAttempts = Math.max(1, maxRetries);
+
+        int attempt = 0;
+        while (attempt < maxAttempts) {
+            try {
+                LOGGER.debug(String.format("%s (attempt %d/%d)", operationName, attempt + 1, maxAttempts));
+                operation.execute();
+                return; // Success, exit retry loop
+            } catch (Exception e) {
+                attempt++;
+                if (attempt >= maxAttempts) {
+                    String message = maxRetries == 0
+                            ? String.format("%s on first attempt (no retries configured)", failureMessage)
+                            : String.format("%s after %d attempts", failureMessage, maxRetries);
+                    LOGGER.error(message, e);
+                    throw new RuntimeException(String.format("%s: %s", message, e.getMessage()), e);
+                } else {
+                    LOGGER.warn(String.format(
+                            "%s attempt %d failed, retrying in %dms: %s",
+                            operationName, attempt, retryDelayMs, e.getMessage()));
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(operationName + " interrupted during retry delay", ie);
+                    }
+                }
             }
         }
     }

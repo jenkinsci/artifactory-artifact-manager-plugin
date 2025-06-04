@@ -14,6 +14,12 @@
                 <f:entry title="${%Prefix_title}" field="prefix">
                         <f:textbox/>
                 </f:entry>
+                <f:entry title="${%MaxUploadRetries_title}" field="maxUploadRetries">
+                        <f:number min="0" max="10" default="0"/>
+                </f:entry>
+                <f:entry title="${%RetryDelaySeconds_title}" field="retryDelaySeconds">
+                        <f:number min="0" max="300" default="5"/>
+                </f:entry>
                 <f:validateButton title="Validate Artifactory configuration" progress="Validate..." method="validateArtifactoryConfig"
                                   with="prefix,serverUrl,storageCredentialId,repository"/>
         </f:section>

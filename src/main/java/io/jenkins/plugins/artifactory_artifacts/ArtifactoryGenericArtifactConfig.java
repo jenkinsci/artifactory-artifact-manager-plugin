@@ -38,10 +38,16 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
 
     public static final Logger LOGGER = LoggerFactory.getLogger(ArtifactoryGenericArtifactConfig.class);
 
+    // Default values for retry configuration
+    public static final int DEFAULT_MAX_UPLOAD_RETRIES = 0;
+    public static final int DEFAULT_RETRY_DELAY_SECONDS = 5;
+
     private String storageCredentialId;
     private String serverUrl;
     private String repository;
     private String prefix;
+    private int maxUploadRetries = DEFAULT_MAX_UPLOAD_RETRIES;
+    private int retryDelaySeconds = DEFAULT_RETRY_DELAY_SECONDS;
 
     @DataBoundConstructor
     public ArtifactoryGenericArtifactConfig() {}
@@ -52,6 +58,23 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.serverUrl = serverUrl;
         this.repository = repository;
         this.prefix = prefix;
+        this.maxUploadRetries = DEFAULT_MAX_UPLOAD_RETRIES;
+        this.retryDelaySeconds = DEFAULT_RETRY_DELAY_SECONDS;
+    }
+
+    public ArtifactoryGenericArtifactConfig(
+            String storageCredentialId,
+            String serverUrl,
+            String repository,
+            String prefix,
+            int maxUploadRetries,
+            int retryDelaySeconds) {
+        this.storageCredentialId = storageCredentialId;
+        this.serverUrl = serverUrl;
+        this.repository = repository;
+        this.prefix = prefix;
+        this.maxUploadRetries = maxUploadRetries;
+        this.retryDelaySeconds = retryDelaySeconds;
     }
 
     public String getStorageCredentialId() {
@@ -88,6 +111,24 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
     @DataBoundSetter
     public void setPrefix(String prefix) {
         this.prefix = prefix;
+    }
+
+    public int getMaxUploadRetries() {
+        return maxUploadRetries;
+    }
+
+    @DataBoundSetter
+    public void setMaxUploadRetries(int maxUploadRetries) {
+        this.maxUploadRetries = Math.max(0, maxUploadRetries); // Minimum 0 retries (no retries)
+    }
+
+    public int getRetryDelaySeconds() {
+        return retryDelaySeconds;
+    }
+
+    @DataBoundSetter
+    public void setRetryDelaySeconds(int retryDelaySeconds) {
+        this.retryDelaySeconds = Math.max(0, retryDelaySeconds); // Minimum 0 seconds (no delay)
     }
 
     public static ArtifactoryGenericArtifactConfig get() {
@@ -170,6 +211,36 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
                 ret = FormValidation.error("Server url doesn't seem valid. Should start with http:// or https://");
             }
             return ret;
+        }
+
+        @SuppressWarnings("lgtm[jenkins/csrf]")
+        public FormValidation doCheckMaxUploadRetries(@QueryParameter int maxUploadRetries) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            if (maxUploadRetries < 0) {
+                return FormValidation.error("Max retries cannot be negative");
+            }
+            if (maxUploadRetries > 10) {
+                return FormValidation.warning("Consider using a lower number of retries to avoid long delays");
+            }
+            if (maxUploadRetries == 0) {
+                return FormValidation.ok("No retries - operations will fail immediately on first error");
+            }
+            return FormValidation.ok();
+        }
+
+        @SuppressWarnings("lgtm[jenkins/csrf]")
+        public FormValidation doCheckRetryDelaySeconds(@QueryParameter int retryDelaySeconds) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            if (retryDelaySeconds < 0) {
+                return FormValidation.error("Retry delay cannot be negative");
+            }
+            if (retryDelaySeconds > 300) {
+                return FormValidation.warning("Consider using a shorter delay to avoid very long waits");
+            }
+            if (retryDelaySeconds == 0) {
+                return FormValidation.ok("No delay - retries will happen immediately");
+            }
+            return FormValidation.ok();
         }
 
         @RequirePOST

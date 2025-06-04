@@ -250,11 +250,29 @@ class ArtifactoryClient implements AutoCloseable {
         private final String serverUrl;
         private final String repository;
         private final UsernamePasswordCredentials credentials;
+        private final int maxUploadRetries;
+        private final int retryDelaySeconds;
 
         public ArtifactoryConfig(String serverUrl, String repository, UsernamePasswordCredentials credentials) {
+            this(
+                    serverUrl,
+                    repository,
+                    credentials,
+                    ArtifactoryGenericArtifactConfig.DEFAULT_MAX_UPLOAD_RETRIES,
+                    ArtifactoryGenericArtifactConfig.DEFAULT_RETRY_DELAY_SECONDS);
+        }
+
+        public ArtifactoryConfig(
+                String serverUrl,
+                String repository,
+                UsernamePasswordCredentials credentials,
+                int maxUploadRetries,
+                int retryDelaySeconds) {
             this.serverUrl = serverUrl;
             this.repository = repository;
             this.credentials = CredentialsProvider.snapshot(UsernamePasswordCredentials.class, credentials);
+            this.maxUploadRetries = maxUploadRetries;
+            this.retryDelaySeconds = retryDelaySeconds;
         }
 
         public String getServerUrl() {
@@ -267,6 +285,14 @@ class ArtifactoryClient implements AutoCloseable {
 
         public UsernamePasswordCredentials getCredentials() {
             return credentials;
+        }
+
+        public int getMaxUploadRetries() {
+            return maxUploadRetries;
+        }
+
+        public int getRetryDelaySeconds() {
+            return retryDelaySeconds;
         }
     }
 }

@@ -23,5 +23,20 @@ public class ConfigurationAsCodeTest extends BaseTest {
         assertThat(config.getServerUrl(), is("http://localhost:7000"));
         assertThat(config.getRepository(), is("my-generic-repo"));
         assertThat(config.getPrefix(), is("jenkins/"));
+        assertThat(config.getMaxUploadRetries(), is(3));
+        assertThat(config.getRetryDelaySeconds(), is(10));
+    }
+
+    @Test
+    @ConfiguredWithCode("configuration-as-code-zero-retries.yml")
+    public void shouldSupportConfigurationAsCodeWithZeroRetries(JenkinsConfiguredWithCodeRule jenkinsRule)
+            throws Exception {
+        ArtifactoryGenericArtifactConfig config = Utils.getArtifactConfig();
+        assertThat(config.getStorageCredentialId(), is("the-credentials-id"));
+        assertThat(config.getServerUrl(), is("http://localhost:7000"));
+        assertThat(config.getRepository(), is("my-generic-repo"));
+        assertThat(config.getPrefix(), is("jenkins/"));
+        assertThat(config.getMaxUploadRetries(), is(0));
+        assertThat(config.getRetryDelaySeconds(), is(0));
     }
 }
