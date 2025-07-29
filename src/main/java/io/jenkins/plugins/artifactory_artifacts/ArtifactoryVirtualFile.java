@@ -4,13 +4,16 @@ import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.model.Run;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import jenkins.util.VirtualFile;
 import org.slf4j.Logger;
@@ -47,7 +50,12 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     @Override
     public String getName() {
         String localKey = Utils.stripTrailingSlash(key);
-        return localKey.replaceFirst(".*/artifacts/", "");
+
+        // Return just the filename/foldername, not the full path
+        int lastSlash = localKey.lastIndexOf('/');
+        String result = lastSlash >= 0 ? localKey.substring(lastSlash + 1) : localKey;
+
+        return result;
     }
 
     @NonNull
@@ -189,8 +197,32 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     private List<VirtualFile> listFilesFromPrefix(String prefix) {
         try (ArtifactoryClient client = buildArtifactoryClient()) {
             List<ArtifactoryClient.FileInfo> files = client.list(prefix);
+
+            Set<String> seen = new HashSet<>();
+
             return files.stream()
-                    .map(info -> new ArtifactoryVirtualFile(info, this.build))
+                    .map(fileInfo -> {
+                        String relativePath = fileInfo.getPath().substring(prefix.length());
+
+                        // Return just the first filename/foldername, not the full path
+                        int slashIndex = relativePath.indexOf('/');
+                        String immediateName = (slashIndex == -1) ? relativePath : relativePath.substring(0, slashIndex);
+
+                        // Check uniqueness
+                        if (!seen.add(immediateName)) {
+                            return null;
+                        }
+
+                        boolean isFolder = (slashIndex != -1);
+
+                        if (isFolder) {
+                            String childKey = prefix + immediateName;
+                            return new ArtifactoryVirtualFile(childKey, this.build);
+                        } else {
+                            return new ArtifactoryVirtualFile(fileInfo, this.build);
+                        }
+                    })
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to list files from prefix %s", prefix), e);
