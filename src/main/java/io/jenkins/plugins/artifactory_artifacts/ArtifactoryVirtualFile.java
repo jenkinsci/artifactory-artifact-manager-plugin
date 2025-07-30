@@ -10,9 +10,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import jenkins.util.VirtualFile;
+import org.jfrog.artifactory.client.model.AqlItemType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +51,14 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     @Override
     public String getName() {
         String localKey = Utils.stripTrailingSlash(key);
-        return localKey.replaceFirst(".*/artifacts/", "");
+
+        localKey = localKey.replaceFirst(".*/artifacts/", "");
+
+        // Return just the filename/foldername, not the full path
+        int lastSlash = localKey.lastIndexOf('/');
+        String result = lastSlash >= 0 ? localKey.substring(lastSlash + 1) : localKey;
+
+        return result;
     }
 
     @NonNull
@@ -181,6 +192,18 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         return new ArtifactoryClient(config.getServerUrl(), config.getRepository(), Utils.getCredentials());
     }
 
+    private String normalizePath(String path) {
+        // Remove double slashes
+        String normalized = path.replaceAll("//+", "/");
+
+        // Remove leading slash
+        if (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+
+        return normalized;
+    }
+
     /**
      * List the files from a prefix
      * @param prefix the prefix
@@ -189,8 +212,44 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
     private List<VirtualFile> listFilesFromPrefix(String prefix) {
         try (ArtifactoryClient client = buildArtifactoryClient()) {
             List<ArtifactoryClient.FileInfo> files = client.list(prefix);
+
+            Set<String> seen = new HashSet<>();
+            String normalizedPrefix = normalizePath(prefix);
+
             return files.stream()
-                    .map(info -> new ArtifactoryVirtualFile(info, this.build))
+                    .map(fileInfo -> {
+                        String normalizedPath = normalizePath(fileInfo.getPath());
+
+                        // Calculate relative path correctly
+                        String relativePath = normalizedPath.startsWith(normalizedPrefix)
+                                ? normalizedPath.substring(normalizedPrefix.length())
+                                : normalizedPath;
+
+                        // Get just the first filename/foldername, not the full path
+                        int slashIndex = relativePath.indexOf('/');
+                        String immediateName =
+                                (slashIndex == -1) ? relativePath : relativePath.substring(0, slashIndex);
+
+                        // Check uniqueness
+                        if (!seen.add(immediateName)) {
+                            return null;
+                        }
+
+                        boolean isFolder = (slashIndex != -1);
+
+                        if (isFolder) {
+                            String folderPath = normalizedPrefix + immediateName;
+                            ArtifactoryClient.FileInfo folderInfo = new ArtifactoryClient.FileInfo(
+                                    folderPath,
+                                    fileInfo.getLastUpdated(),
+                                    0, // folder size 0
+                                    AqlItemType.FOLDER);
+                            return new ArtifactoryVirtualFile(folderInfo, this.build);
+                        } else {
+                            return new ArtifactoryVirtualFile(fileInfo, this.build);
+                        }
+                    })
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to list files from prefix %s", prefix), e);
