@@ -30,8 +30,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldRetryArtifactUploadOnTransientFailure";
 
         // Create pipeline that archives a simple file
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'artifact.txt', text: 'Hello World'
                 archiveArtifacts artifacts: 'artifact.txt'
@@ -80,8 +79,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldFailArtifactUploadAfterMaxRetries";
 
         // Create pipeline that archives a simple file
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'artifact.txt', text: 'Hello World'
                 archiveArtifacts artifacts: 'artifact.txt'
@@ -120,8 +118,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldRetryStashUploadOnTransientFailure";
 
         // Create pipeline that creates a stash
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'stash-file.txt', text: 'Stash content'
                 stash name: 'test-stash', includes: 'stash-file.txt'
@@ -170,8 +167,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldFailStashUploadAfterMaxRetries";
 
         // Create pipeline that creates a stash
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'stash-file.txt', text: 'Stash content'
                 stash name: 'test-stash', includes: 'stash-file.txt'
@@ -211,8 +207,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldSucceedImmediatelyWhenNoFailures";
 
         // Create pipeline that archives a file and creates a stash
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'artifact.txt', text: 'Hello World'
                 writeFile file: 'stash-file.txt', text: 'Stash content'
@@ -253,8 +248,7 @@ public class ArtifactoryRetryMechanismTest extends BaseTest {
         String pipelineName = "shouldFailImmediatelyWithZeroRetries";
 
         // Create pipeline that archives a file
-        String pipeline =
-                """
+        String pipeline = """
             node {
                 writeFile file: 'artifact.txt', text: 'Hello World'
                 archiveArtifacts artifacts: 'artifact.txt'
