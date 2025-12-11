@@ -9,14 +9,9 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import jenkins.util.VirtualFile;
-import org.jfrog.artifactory.client.model.AqlItemType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +25,9 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
 
     private final transient Run<?, ?> build;
     private final ArtifactoryClient.FileInfo fileInfo;
+
+    // Cached client - reused across operations to avoid creating/destroying connections
+    private transient ArtifactoryClient cachedClient;
 
     public ArtifactoryVirtualFile(String key, Run<?, ?> build) {
         this.key = key;
@@ -91,8 +89,8 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         if (keyWithNoSlash.endsWith("/*view*")) {
             return false;
         }
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            return client.isFolder(this.key);
+        try {
+            return buildArtifactoryClient().isFolder(this.key);
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to check if %s is a directory", this.key), e);
             return false;
@@ -108,8 +106,8 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         if (keyS.endsWith("/*view*/")) {
             return false;
         }
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            return client.isFile(this.key);
+        try {
+            return buildArtifactoryClient().isFile(this.key);
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to check if %s is a file", this.key), e);
             return false;
@@ -144,8 +142,8 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         if (this.fileInfo != null) {
             return this.fileInfo.getSize();
         }
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            return client.size(this.key);
+        try {
+            return buildArtifactoryClient().size(this.key);
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to get size of %s", this.key), e);
             return 0;
@@ -157,8 +155,8 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         if (this.fileInfo != null) {
             return this.fileInfo.getLastUpdated();
         }
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            return client.lastUpdated(this.key);
+        try {
+            return buildArtifactoryClient().lastUpdated(this.key);
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to get last updated time of %s", this.key), e);
             return 0;
@@ -179,81 +177,41 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         if (!isFile()) {
             throw new FileNotFoundException("Cannot open it because it is not a file.");
         }
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            return client.downloadArtifact(this.key);
+        try {
+            return buildArtifactoryClient().downloadArtifact(this.key);
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to open %s", this.key), e);
             throw new IOException(e);
         }
     }
 
+    /**
+     * Lazily creates and caches an ArtifactoryClient
+     * @return a cached ArtifactoryClient instance
+     */
     private ArtifactoryClient buildArtifactoryClient() {
-        ArtifactoryGenericArtifactConfig config = Utils.getArtifactConfig();
-        return new ArtifactoryClient(config.getServerUrl(), config.getRepository(), Utils.getCredentials());
-    }
-
-    private String normalizePath(String path) {
-        // Remove double slashes
-        String normalized = path.replaceAll("//+", "/");
-
-        // Remove leading slash
-        if (normalized.startsWith("/")) {
-            normalized = normalized.substring(1);
+        if (cachedClient == null) {
+            ArtifactoryGenericArtifactConfig config = Utils.getArtifactConfig();
+            cachedClient = new ArtifactoryClient(config.getServerUrl(), config.getRepository(), Utils.getCredentials());
         }
-
-        return normalized;
+        return cachedClient;
     }
 
     /**
      * List the files from a prefix
      * @param prefix the prefix
-     * @return the list of files from the prefix
+     * @return the list of files and folders from the prefix
      */
     private List<VirtualFile> listFilesFromPrefix(String prefix) {
-        try (ArtifactoryClient client = buildArtifactoryClient()) {
-            List<ArtifactoryClient.FileInfo> files = client.list(prefix);
+        try {
+            List<ArtifactoryClient.FileInfo> children = buildArtifactoryClient().list(prefix);
 
-            Set<String> seen = new HashSet<>();
-            String normalizedPrefix = normalizePath(prefix);
-
-            return files.stream()
-                    .map(fileInfo -> {
-                        String normalizedPath = normalizePath(fileInfo.getPath());
-
-                        // Calculate relative path correctly
-                        String relativePath = normalizedPath.startsWith(normalizedPrefix)
-                                ? normalizedPath.substring(normalizedPrefix.length())
-                                : normalizedPath;
-
-                        // Get just the first filename/foldername, not the full path
-                        int slashIndex = relativePath.indexOf('/');
-                        String immediateName =
-                                (slashIndex == -1) ? relativePath : relativePath.substring(0, slashIndex);
-
-                        // Check uniqueness
-                        if (!seen.add(immediateName)) {
-                            return null;
-                        }
-
-                        boolean isFolder = (slashIndex != -1);
-
-                        if (isFolder) {
-                            String folderPath = normalizedPrefix + immediateName;
-                            ArtifactoryClient.FileInfo folderInfo = new ArtifactoryClient.FileInfo(
-                                    folderPath,
-                                    fileInfo.getLastUpdated(),
-                                    0, // folder size 0
-                                    AqlItemType.FOLDER);
-                            return new ArtifactoryVirtualFile(folderInfo, this.build);
-                        } else {
-                            return new ArtifactoryVirtualFile(fileInfo, this.build);
-                        }
-                    })
-                    .filter(Objects::nonNull)
+            return children.stream()
+                    .map(fileInfo -> new ArtifactoryVirtualFile(fileInfo, this.build))
                     .collect(Collectors.toList());
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to list files from prefix %s", prefix), e);
-            return Collections.emptyList();
+            return List.of();
         }
     }
 }
