@@ -137,10 +137,14 @@ class ArtifactoryClient implements AutoCloseable {
                             }
 
                             long lastModified = 0;
-                            try {
-                                lastModified = lastUpdated(childPath);
-                            } catch (Exception e) {
-                                LOGGER.warn(String.format("Failed to get last updated time of %s", childPath), e);
+                            if (item.getLastModified() != null) {
+                                lastModified = item.getLastModified().getTime();
+                            } else {
+                                try {
+                                    lastModified = lastUpdated(childPath);
+                                } catch (Exception e) {
+                                    LOGGER.warn(String.format("Failed to get last updated time of %s", childPath), e);
+                                }
                             }
 
                             return new FileInfo(
