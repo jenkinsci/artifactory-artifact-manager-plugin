@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.jfrog.artifactory.client.*;
 import org.jfrog.artifactory.client.model.*;
@@ -152,7 +153,7 @@ class ArtifactoryClient implements AutoCloseable {
                             return null;
                         }
                     })
-                    .filter(fileInfo -> fileInfo != null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             LOGGER.warn(String.format("Failed to list folder contents for %s", targetPath), e);
