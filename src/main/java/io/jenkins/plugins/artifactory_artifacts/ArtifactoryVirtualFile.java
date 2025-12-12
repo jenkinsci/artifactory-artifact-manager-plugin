@@ -3,6 +3,7 @@ package io.jenkins.plugins.artifactory_artifacts;
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.model.Run;
+import hudson.remoting.Callable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -185,6 +186,17 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
         }
     }
 
+    @Override
+    public <V> V run(Callable<V, IOException> callable) throws IOException {
+        try {
+            // Call the operation
+            return callable.call();
+        } finally {
+            // Clean up the client after the operation completes
+            closeArtifactoryClient();
+        }
+    }
+
     /**
      * Lazily creates and caches an ArtifactoryClient
      * @return a cached ArtifactoryClient instance
@@ -195,6 +207,20 @@ public class ArtifactoryVirtualFile extends ArtifactoryAbstractVirtualFile {
             cachedClient = new ArtifactoryClient(config.getServerUrl(), config.getRepository(), Utils.getCredentials());
         }
         return cachedClient;
+    }
+
+    /**
+     * Closes the cached ArtifactoryClient
+     */
+    private void closeArtifactoryClient() {
+        if (cachedClient != null) {
+            try {
+                cachedClient.close();
+            } catch (Exception e) {
+                LOGGER.warn(String.format("Failed to close Artifactory client"), e);
+            }
+            cachedClient = null;
+        }
     }
 
     /**
