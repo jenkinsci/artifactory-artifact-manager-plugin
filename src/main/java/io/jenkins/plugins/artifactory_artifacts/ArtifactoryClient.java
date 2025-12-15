@@ -9,10 +9,10 @@ import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.jfrog.artifactory.client.*;
 import org.jfrog.artifactory.client.model.*;
-import org.jfrog.filespecs.FileSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +74,7 @@ class ArtifactoryClient implements AutoCloseable {
      */
     public void copy(String sourcePath, String targetPath) {
         ItemHandle sourceItem = artifactory.repository(this.config.repository).folder(Utils.urlEncodeParts(sourcePath));
-        sourceItem.copy(this.config.repository, targetPath);
+        sourceItem.copy(this.config.repository, Utils.urlEncodeParts(targetPath));
     }
 
     /**
@@ -106,6 +106,7 @@ class ArtifactoryClient implements AutoCloseable {
 
     /**
      * List the files in a folder
+     * Uses Artifactory Storage API
      * @param targetPath the path to list
      * @return the list of files in the folder
      * @throws IOException if the files cannot be listed
@@ -115,15 +116,53 @@ class ArtifactoryClient implements AutoCloseable {
             LOGGER.debug(String.format("Target path %s is not a folder. Cannot list files", targetPath));
             return List.of();
         }
-        FileSpec fileSpec = FileSpec.fromString(
-                String.format("{\"files\": [{\"pattern\": \"%s/%s*\"}]}", this.config.repository, targetPath));
-        return artifactory.searches().artifactsByFileSpec(fileSpec).stream()
-                .map((item -> new FileInfo(
-                        String.format("%s/%s", item.getPath(), item.getName()),
-                        item.getModified().getTime(),
-                        item.getSize(),
-                        item.getType())))
-                .collect(Collectors.toList());
+
+        try {
+            ItemHandle folderHandle =
+                    artifactory.repository(this.config.repository).folder(Utils.urlEncodeParts(targetPath));
+            Folder folder = folderHandle.info();
+            List<Item> children = folder.getChildren();
+            return children.stream()
+                    .map(item -> {
+                        try {
+                            String childPath = targetPath.endsWith("/")
+                                    ? targetPath + item.getUri().substring(1)
+                                    : targetPath + item.getUri();
+
+                            long size = 0;
+                            try {
+                                size = size(childPath);
+                            } catch (Exception e) {
+                                LOGGER.warn(String.format("Failed to get size of %s", childPath), e);
+                            }
+
+                            long lastModified = 0;
+                            if (item.getLastModified() != null) {
+                                lastModified = item.getLastModified().getTime();
+                            } else {
+                                try {
+                                    lastModified = lastUpdated(childPath);
+                                } catch (Exception e) {
+                                    LOGGER.warn(String.format("Failed to get last updated time of %s", childPath), e);
+                                }
+                            }
+
+                            return new FileInfo(
+                                    childPath,
+                                    lastModified,
+                                    size,
+                                    item.isFolder() ? AqlItemType.FOLDER : AqlItemType.FILE);
+                        } catch (Exception e) {
+                            LOGGER.error(String.format("Error processing item in %s", targetPath), e);
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            LOGGER.warn(String.format("Failed to list folder contents for %s", targetPath), e);
+            return List.of();
+        }
     }
 
     /**
@@ -158,7 +197,7 @@ class ArtifactoryClient implements AutoCloseable {
         LOGGER.trace(String.format("Getting last updated time for %s", targetPath));
         return artifactory
                 .repository(this.config.repository)
-                .file(targetPath)
+                .file(Utils.urlEncodeParts(targetPath))
                 .info()
                 .getLastModified()
                 .getTime();
