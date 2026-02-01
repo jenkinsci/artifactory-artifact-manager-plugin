@@ -17,7 +17,7 @@ services:
               memory: 256m
 
   artifactory:
-    image: releases-docker.jfrog.io/jfrog/artifactory-oss:7.77.12
+    image: releases-docker.jfrog.io/jfrog/artifactory-oss:7.133.3
     container_name: artifactory
     restart: always
     ports:
