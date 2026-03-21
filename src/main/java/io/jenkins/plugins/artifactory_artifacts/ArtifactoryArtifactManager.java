@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import jenkins.MasterToSlaveFileCallable;
+import jenkins.agents.ControllerToAgentFileCallable;
 import jenkins.model.ArtifactManager;
 import jenkins.util.VirtualFile;
 import org.jenkinsci.plugins.workflow.flow.StashManager;
@@ -233,34 +233,19 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
     /**
      * Master to slave callable that stashes files to Artifactory storage.
      */
-    private static final class Stash extends MasterToSlaveFileCallable<Void> {
-        private static final long serialVersionUID = 1L;
-        private final ArtifactoryClient.ArtifactoryConfig config;
-        private final String path, includes, excludes;
-        private final boolean useDefaultExcludes;
-        private final boolean allowEmpty;
-        private final String tempDir;
-        private final TaskListener listener;
+    private record Stash(
+            ArtifactoryClient.ArtifactoryConfig config,
+            String path,
+            String includes,
+            String excludes,
+            boolean useDefaultExcludes,
+            boolean allowEmpty,
+            String tempDir,
+            TaskListener listener)
+            implements ControllerToAgentFileCallable<Void> {
 
-        public Stash(
-                ArtifactoryClient.ArtifactoryConfig config,
-                String path,
-                String includes,
-                String excludes,
-                boolean useDefaultExcludes,
-                boolean allowEmpty,
-                String tempDir,
-                TaskListener listener)
-                throws IOException {
-            this.config = config;
-            this.path = path;
-            this.includes = includes;
-            this.excludes = excludes;
-            this.useDefaultExcludes = useDefaultExcludes;
-            this.allowEmpty = allowEmpty;
-            this.tempDir = tempDir;
-            this.listener = listener;
-        }
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         @Override
         public Void invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
@@ -316,18 +301,11 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
     /**
      * Master to slave callable that unstashes files from Artifactory storage.
      */
-    private static final class Unstash extends MasterToSlaveFileCallable<Void> {
-        private static final long serialVersionUID = 1L;
-        private final ArtifactoryClient.ArtifactoryConfig config;
-        private final String path;
-        private final TaskListener listener;
+    private record Unstash(ArtifactoryClient.ArtifactoryConfig config, String path, TaskListener listener)
+            implements ControllerToAgentFileCallable<Void> {
 
-        public Unstash(ArtifactoryClient.ArtifactoryConfig config, String path, TaskListener listener)
-                throws IOException {
-            this.config = config;
-            this.path = path;
-            this.listener = listener;
-        }
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         @Override
         public Void invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
@@ -348,15 +326,8 @@ public class ArtifactoryArtifactManager extends ArtifactManager implements Stash
     /**
      * Master to slave callable that uploads files to Artifactory storage.
      */
-    private static class UploadToArtifactoryStorage extends MasterToSlaveFileCallable<Void> {
-
-        private final List<UploadFile> files;
-        private final ArtifactoryClient.ArtifactoryConfig config;
-
-        public UploadToArtifactoryStorage(ArtifactoryClient.ArtifactoryConfig config, List<UploadFile> files) {
-            this.config = config;
-            this.files = files;
-        }
+    private record UploadToArtifactoryStorage(ArtifactoryClient.ArtifactoryConfig config, List<UploadFile> files)
+            implements ControllerToAgentFileCallable<Void> {
 
         @Override
         public Void invoke(File folder, VirtualChannel channel) throws IOException, InterruptedException {
