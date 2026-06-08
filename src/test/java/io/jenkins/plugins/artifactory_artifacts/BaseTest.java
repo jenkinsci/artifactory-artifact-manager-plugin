@@ -113,6 +113,17 @@ public class BaseTest {
         wireMock.register(WireMock.get(WireMock.urlEqualTo(urlEncodeParts(stashFileBasePath + "/" + stash)))
                 .willReturn(WireMock.ok().withBodyFile(stash).withHeader("Content-Type", "application/gzip")));
 
+        // Stash delete (in case of failure)
+        wireMock.register(WireMock.get(WireMock.urlMatching("/api/storage/my-generic-repo/.*/1/stashes"))
+                .willReturn(WireMock.okJson(("""
+                        {
+                            "uri": "/api/storage/my-generic-repo/.*/1/stashes",
+                            "children": []
+                        }"""))));
+
+        wireMock.register(WireMock.delete(WireMock.urlMatching("/my-generic-repo/.*/1/stashes"))
+                .willReturn(WireMock.noContent()));
+
         // Register POST request
         wireMock.register(
                 WireMock.post(WireMock.urlMatching("/api/search/aql")).willReturn(WireMock.okJson(aqlResponse)));
