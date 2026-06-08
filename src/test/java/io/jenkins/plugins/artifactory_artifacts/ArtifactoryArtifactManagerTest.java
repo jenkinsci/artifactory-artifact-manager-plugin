@@ -194,18 +194,15 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
     }
 
     @Test
-    public void testConfigRoundtrip(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo) throws Exception {
-
-        // Set config
-        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "jenkins/");
-
-        // Save config
-        jenkinsRule.configRoundtrip();
-
-        // Assert config
-        assertThat(config.getStorageCredentialId(), is("the-credentials-id"));
-        assertThat(config.getServerUrl(), is("http://localhost:" + wmRuntimeInfo.getHttpPort()));
-        assertThat(config.getRepository(), is("my-generic-repo"));
-        assertThat(config.getPrefix(), is("jenkins/"));
+    public void testConfigRoundtrip(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wireMockPort, "jenkins/");
+            jenkinsRule.configRoundtrip();
+            assertThat(config.getStorageCredentialId(), is("the-credentials-id"));
+            assertThat(config.getServerUrl(), is("http://localhost:" + wireMockPort));
+            assertThat(config.getRepository(), is("my-generic-repo"));
+            assertThat(config.getPrefix(), is("jenkins/"));
+        });
     }
 }
