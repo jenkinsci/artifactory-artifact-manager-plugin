@@ -14,18 +14,20 @@ import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.junit.jupiter.RealJenkinsExtension;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 
 @WithJenkins
 @WireMockTest
 public class ArtifactoryArtifactManagerTest extends BaseTest {
+    @RegisterExtension
+    final RealJenkinsExtension realJenkinsExtension = new RealJenkinsExtension();
 
     @Test
-    public void shouldDeleteArtifactWhenDeletingJob(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
-            throws Exception {
-        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "");
-
+    public void shouldDeleteArtifactWhenDeletingJob(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipelineName = "shouldDeleteArtifactWhenDeletingJob";
 
         // Create pipeline and run it
@@ -53,7 +55,7 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
                 + "\"modifiedBy\": \"admin\","
                 + "\"path\": \"" + folderPath + "\","
                 + "\"repo\": \"my-generic-repo\","
-                + "\"uri\": \"http://localhost:" + wmRuntimeInfo.getHttpPort() + "/artifactory" + folderPath + "\""
+                + "\"uri\": \"http://localhost:" + wireMockPort + "/artifactory" + folderPath + "\""
                 + "}";
         wmRuntimeInfo
                 .getWireMock()
@@ -65,24 +67,21 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
                 .register(WireMock.delete(WireMock.urlEqualTo("/my-generic-repo/" + pipelineName))
                         .willReturn(WireMock.ok()));
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
-
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Delete job
-        workflowJob.delete();
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, "");
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            workflowJob.delete();
+        });
     }
 
     @Test
-    public void shouldDeleteArtifactWhenDeletingBuild(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
-            throws Exception {
-        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "");
-
+    public void shouldDeleteArtifactWhenDeletingBuild(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipelineName = "shouldDeleteArtifactWhenDeletingBuild";
 
         // Create pipeline and run it
@@ -110,7 +109,7 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
                 + "\"modifiedBy\": \"admin\","
                 + "\"path\": \"" + folderPath + "\","
                 + "\"repo\": \"my-generic-repo\","
-                + "\"uri\": \"http://localhost:" + wmRuntimeInfo.getHttpPort() + "/artifactory" + folderPath + "\""
+                + "\"uri\": \"http://localhost:" + wireMockPort + "/artifactory" + folderPath + "\""
                 + "}";
         wmRuntimeInfo
                 .getWireMock()
@@ -122,17 +121,16 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
                 .register(WireMock.delete(WireMock.urlEqualTo("/my-generic-repo/" + pipelineName + "/1/"))
                         .willReturn(WireMock.ok()));
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
-
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Delete job
-        workflowJob.getLastBuild().delete();
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, "");
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            workflowJob.getLastBuild().delete();
+        });
     }
 
     @Test

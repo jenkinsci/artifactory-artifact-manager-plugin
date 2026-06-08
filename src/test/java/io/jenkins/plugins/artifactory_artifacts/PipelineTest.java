@@ -18,191 +18,165 @@ import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.junit.jupiter.api.Test;
-import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.jvnet.hudson.test.junit.jupiter.RealJenkinsExtension;
 
-@WithJenkins
 @WireMockTest
 public class PipelineTest extends BaseTest {
+    @RegisterExtension
+    final RealJenkinsExtension realJenkinsExtension = new RealJenkinsExtension();
 
     @Test
-    public void testPipelineWithPrefix(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo) throws Exception {
+    public void testPipelineWithPrefix(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
         final String pipelineName = "testPipelineWithPrefix";
         final String prefix = "jenkins/";
         final String artifact = "artifact.txt";
 
-        configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), prefix);
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipeline = IOUtils.toString(
                 Objects.requireNonNull(PipelineTest.class.getResourceAsStream("/pipelines/archiveController.groovy")),
                 StandardCharsets.UTF_8);
 
         // Setup wiremock stubs
-        setupWireMockStubs(
-                pipelineName, wmRuntimeInfo.getWireMock(), wmRuntimeInfo.getHttpPort(), prefix, artifact, "stash.tgz");
+        setupWireMockStubs(pipelineName, wmRuntimeInfo.getWireMock(), wireMockPort, prefix, artifact, "stash.tgz");
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, prefix);
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            assertThat(run1.getArtifacts(), hasSize(1));
+        });
 
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Verify artifact was uploaded
         WireMock.verify(WireMock.putRequestedFor(WireMock.urlEqualTo(getArtifactUrl(prefix, pipelineName, artifact)))
                 .withRequestBody(WireMock.equalTo("Hello, World!")));
-
-        // Check 1 artifact
-        assertThat(run1.getArtifacts(), hasSize(1));
     }
 
     @Test
-    public void testPipelineWithSpaces(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo) throws Exception {
+    public void testPipelineWithSpaces(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
 
         final String pipelineName = "test Pipeline With spaces";
         final String prefix = "jenkins artifacts/";
         final String artifact = "my artifact.txt";
 
-        configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), prefix);
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipeline = IOUtils.toString(
                 Objects.requireNonNull(
                         PipelineTest.class.getResourceAsStream("/pipelines/archiveControllerWithSpaces.groovy")),
                 StandardCharsets.UTF_8);
 
         // Setup wiremock stubs
-        setupWireMockStubs(
-                pipelineName,
-                wmRuntimeInfo.getWireMock(),
-                wmRuntimeInfo.getHttpPort(),
-                prefix,
-                artifact,
-                "my stash.tgz");
+        setupWireMockStubs(pipelineName, wmRuntimeInfo.getWireMock(), wireMockPort, prefix, artifact, "my stash.tgz");
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, prefix);
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            assertThat(run1.getArtifacts(), hasSize(1));
+        });
 
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Verify artifact was uploaded
         WireMock.verify(WireMock.putRequestedFor(WireMock.urlEqualTo(getArtifactUrl(prefix, pipelineName, artifact)))
                 .withRequestBody(WireMock.equalTo("Hello, World!")));
-
-        // Check 1 artifact
-        assertThat(run1.getArtifacts(), hasSize(1));
     }
 
     @Test
-    public void testPipelineWithoutPrefix(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo) throws Exception {
+    public void testPipelineWithoutPrefix(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
 
         final String pipelineName = "testPipelineWithoutPrefix";
         final String prefix = "";
         final String artifact = "artifact.txt";
 
-        configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), prefix);
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipeline = IOUtils.toString(
                 Objects.requireNonNull(PipelineTest.class.getResourceAsStream("/pipelines/archiveController.groovy")),
                 StandardCharsets.UTF_8);
 
         // Setup wiremock stubs
-        setupWireMockStubs(
-                pipelineName, wmRuntimeInfo.getWireMock(), wmRuntimeInfo.getHttpPort(), prefix, artifact, "stash.tgz");
+        setupWireMockStubs(pipelineName, wmRuntimeInfo.getWireMock(), wireMockPort, prefix, artifact, "stash.tgz");
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, prefix);
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            assertThat(run1.getArtifacts(), hasSize(1));
+        });
 
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Verify artifact was uploaded
         WireMock.verify(WireMock.putRequestedFor(WireMock.urlEqualTo(getArtifactUrl(prefix, pipelineName, artifact)))
                 .withRequestBody(WireMock.equalTo("Hello, World!")));
-
-        // Check 1 artifact
-        assertThat(run1.getArtifacts(), hasSize(1));
     }
 
     @Test
-    public void testPipelineOnAgentWithPrefix(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
-            throws Exception {
+    public void testPipelineOnAgentWithPrefix(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
 
         final String pipelineName = "testPipelineWithPrefix";
         final String prefix = "jenkins/";
         final String artifact = "artifact.txt";
 
-        configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), prefix);
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipeline = IOUtils.toString(
                 Objects.requireNonNull(PipelineTest.class.getResourceAsStream("/pipelines/archiveAgent.groovy")),
                 StandardCharsets.UTF_8);
 
-        DumbSlave s = jenkinsRule.createSlave(Label.get("agent"));
-
         // Setup wiremock stubs
-        setupWireMockStubs(
-                pipelineName, wmRuntimeInfo.getWireMock(), wmRuntimeInfo.getHttpPort(), prefix, artifact, "stash.tgz");
+        setupWireMockStubs(pipelineName, wmRuntimeInfo.getWireMock(), wireMockPort, prefix, artifact, "stash.tgz");
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, prefix);
+            DumbSlave s = jenkinsRule.createSlave(Label.get("agent"));
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            assertThat(run1.getArtifacts(), hasSize(1));
+        });
 
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Verify artifact was uploaded
         WireMock.verify(WireMock.putRequestedFor(WireMock.urlEqualTo(getArtifactUrl(prefix, pipelineName, artifact)))
                 .withRequestBody(WireMock.equalTo("Hello, World!")));
-
-        // Check 1 artifact
-        assertThat(run1.getArtifacts(), hasSize(1));
     }
 
     @Test
-    public void testReplay(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo) throws Exception {
+    public void testReplay(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
 
         final String pipelineName = "testReplay";
 
-        configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "jenkins/");
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
         String pipeline = IOUtils.toString(
                 Objects.requireNonNull(PipelineTest.class.getResourceAsStream("/pipelines/replay.groovy")),
                 StandardCharsets.UTF_8);
 
         // Setup wiremock stubs
         setupWireMockStubs(
-                pipelineName,
-                wmRuntimeInfo.getWireMock(),
-                wmRuntimeInfo.getHttpPort(),
-                "jenkins/",
-                "artifact.txt",
-                "stash.tgz");
+                pipelineName, wmRuntimeInfo.getWireMock(), wireMockPort, "jenkins/", "artifact.txt", "stash.tgz");
 
-        // Run job
-        WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
-        workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
-        WorkflowRun run1 = Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
-        jenkinsRule.waitForCompletion(run1);
-
-        // Print pipeline logs
-        System.out.println(run1.getLog());
-
-        // Job success
-        assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
-
-        // Perform replay of the pipeline
-        HtmlPage buildPage = jenkinsRule.createWebClient().goTo("job/testReplay/1");
-        final HtmlAnchor replayLink = buildPage.getAnchorByText("Replay");
-        final HtmlPage replayPage = replayLink.click();
-        // HtmlSelect stageSelect = replayPage.getFirstByXPath("//select[@name='Result']");
-        // final HtmlOption resultOption = stageSelect.getOptionByText("Result");
-        // stageSelect.setSelectedAttribute(resultOption, true);
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            configureConfig(jenkinsRule, wireMockPort, "jenkins/");
+            WorkflowJob workflowJob = jenkinsRule.createProject(WorkflowJob.class, pipelineName);
+            workflowJob.setDefinition(new CpsFlowDefinition(pipeline, true));
+            WorkflowRun run1 =
+                    Objects.requireNonNull(workflowJob.scheduleBuild2(0)).waitForStart();
+            jenkinsRule.waitForCompletion(run1);
+            System.out.println(run1.getLog());
+            assertThat(run1.getResult(), equalTo(hudson.model.Result.SUCCESS));
+            HtmlPage buildPage = jenkinsRule.createWebClient().goTo("job/testReplay/1");
+            final HtmlAnchor replayLink = buildPage.getAnchorByText("Replay");
+            final HtmlPage replayPage = replayLink.click();
+            // HtmlSelect stageSelect = replayPage.getFirstByXPath("//select[@name='Result']");
+            // final HtmlOption resultOption = stageSelect.getOptionByText("Result");
+            // stageSelect.setSelectedAttribute(resultOption, true);
+        });
     }
 
     private String getArtifactUrl(String prefix, String pipelineName, String artifact) {
