@@ -9,10 +9,16 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import jenkins.model.ArtifactManagerConfiguration;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.junit.jupiter.RealJenkinsExtension;
 
 public class BaseTest {
 
-    protected ArtifactoryGenericArtifactConfig configureConfig(JenkinsRule jenkinsRule, int port, String prefix)
+    protected static void runWithRealJenkins(RealJenkinsExtension realJenkinsExtension, RealJenkinsExtension.Step step)
+            throws Throwable {
+        realJenkinsExtension.then(step);
+    }
+
+    protected static ArtifactoryGenericArtifactConfig configureConfig(JenkinsRule jenkinsRule, int port, String prefix)
             throws Exception {
 
         // Create generic config with optimized retry settings for faster tests
@@ -41,7 +47,7 @@ public class BaseTest {
      * Setup WireMock stubs
      * @param wmRuntimeInfo the WireMock runtime info
      */
-    protected void setupWireMockStubs(
+    protected static void setupWireMockStubs(
             final String jobName, WireMock wireMock, int port, String prefix, String artifact, String stash) {
 
         // PUT to upload artifact
@@ -122,7 +128,7 @@ public class BaseTest {
      * Setup WireMock stubs excluding PUT requests (for retry tests)
      * @param wmRuntimeInfo the WireMock runtime info
      */
-    protected void setupOtherWireMockStubs(
+    protected static void setupOtherWireMockStubs(
             final String jobName, WireMock wireMock, int port, String prefix, String artifact, String stash) {
 
         // Define the base URL
@@ -195,7 +201,7 @@ public class BaseTest {
                 WireMock.post(WireMock.urlMatching("/api/search/aql")).willReturn(WireMock.okJson(aqlResponse)));
     }
 
-    private String urlEncodeParts(String s) {
+    private static String urlEncodeParts(String s) {
         return URLEncoder.encode(s, StandardCharsets.UTF_8)
                 .replaceAll("%2F", "/")
                 .replace("+", "%20");
