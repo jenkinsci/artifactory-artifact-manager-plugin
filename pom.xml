@@ -54,6 +54,7 @@
     <dependency>
       <groupId>io.jenkins.plugins</groupId>
       <artifactId>artifactory-client-api</artifactId>
+      <version>2.21.2-163.v859dc6dfb_f60</version>
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
