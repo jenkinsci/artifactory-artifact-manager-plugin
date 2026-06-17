@@ -134,53 +134,53 @@ public class ArtifactoryArtifactManagerTest extends BaseTest {
     }
 
     @Test
-    public void shouldDoValidateArtifactoryConfig(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
-            throws Exception {
-        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "/jenkins");
-        ArtifactoryGenericArtifactConfig.DescriptorImpl descriptor =
-                jenkinsRule.getInstance().getDescriptorByType(ArtifactoryGenericArtifactConfig.DescriptorImpl.class);
-
-        // WireMock stub
-        WireMock wireMock = wmRuntimeInfo.getWireMock();
+    public void shouldDoValidateArtifactoryConfig(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
 
         // PUT and delete to validate
+        WireMock wireMock = wmRuntimeInfo.getWireMock();
         wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/jenkins/tmp-.*-artifactory-plugin-test"))
                 .willReturn(WireMock.okJson("{}")));
         wireMock.register(
                 WireMock.delete(WireMock.urlMatching("/my-generic-repo/jenkins/tmp-.*-artifactory-plugin-test"))
                         .willReturn(WireMock.okJson("{}")));
 
-        // Test
-        FormValidation validation = descriptor.doValidateArtifactoryConfig(
-                config.getServerUrl(), config.getStorageCredentialId(), config.getRepository(), config.getPrefix());
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wireMockPort, "/jenkins");
+            ArtifactoryGenericArtifactConfig.DescriptorImpl descriptor = jenkinsRule
+                    .getInstance()
+                    .getDescriptorByType(ArtifactoryGenericArtifactConfig.DescriptorImpl.class);
 
-        // Assert
-        assertThat(validation.kind, is(FormValidation.Kind.OK));
+            FormValidation validation = descriptor.doValidateArtifactoryConfig(
+                    config.getServerUrl(), config.getStorageCredentialId(), config.getRepository(), config.getPrefix());
+
+            assertThat(validation.kind, is(FormValidation.Kind.OK));
+        });
     }
 
     @Test
-    public void shouldFailToDoValidateArtifactoryConfig(JenkinsRule jenkinsRule, WireMockRuntimeInfo wmRuntimeInfo)
-            throws Exception {
-        ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wmRuntimeInfo.getHttpPort(), "jenkins/");
-        ArtifactoryGenericArtifactConfig.DescriptorImpl descriptor =
-                jenkinsRule.getInstance().getDescriptorByType(ArtifactoryGenericArtifactConfig.DescriptorImpl.class);
-
-        // WireMock stub
-        WireMock wireMock = wmRuntimeInfo.getWireMock();
+    public void shouldFailToDoValidateArtifactoryConfig(WireMockRuntimeInfo wmRuntimeInfo) throws Throwable {
+        int wireMockPort = wmRuntimeInfo.getHttpPort();
 
         // 404 not found
+        WireMock wireMock = wmRuntimeInfo.getWireMock();
         wireMock.register(WireMock.put(WireMock.urlMatching("/my-generic-repo/jenkins/tmp-.*-artifactory-plugin-test"))
                 .willReturn(WireMock.notFound()));
 
-        // Test
-        FormValidation validation = descriptor.doValidateArtifactoryConfig(
-                config.getServerUrl(), config.getStorageCredentialId(), config.getRepository(), config.getPrefix());
+        runWithRealJenkins(realJenkinsExtension, jenkinsRule -> {
+            ArtifactoryGenericArtifactConfig config = configureConfig(jenkinsRule, wireMockPort, "jenkins/");
+            ArtifactoryGenericArtifactConfig.DescriptorImpl descriptor = jenkinsRule
+                    .getInstance()
+                    .getDescriptorByType(ArtifactoryGenericArtifactConfig.DescriptorImpl.class);
 
-        // Assert
-        assertThat(validation.kind, is(FormValidation.Kind.ERROR));
-        assertThat(
-                validation.getMessage(),
-                startsWith("Unable to connect to Artifactory. Please check the server url and credentials"));
+            FormValidation validation = descriptor.doValidateArtifactoryConfig(
+                    config.getServerUrl(), config.getStorageCredentialId(), config.getRepository(), config.getPrefix());
+
+            assertThat(validation.kind, is(FormValidation.Kind.ERROR));
+            assertThat(
+                    validation.getMessage(),
+                    startsWith("Unable to connect to Artifactory. Please check the server url and credentials"));
+        });
     }
 
     @Test
