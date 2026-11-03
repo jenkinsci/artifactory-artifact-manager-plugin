@@ -143,6 +143,7 @@ public class ArtifactoryGenericArtifactConfig extends AbstractDescribableImpl<Ar
         this.disableDirectDownload = disableDirectDownload;
     }
 
+    @DataBoundSetter
     public static ArtifactoryGenericArtifactConfig get() {
         return ExtensionList.lookupSingleton(ArtifactoryGenericArtifactConfig.class);
     }
